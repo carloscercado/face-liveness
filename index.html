@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial de Movimientos Faciales</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      padding-top: 20px;
+    }
+    #container {
+      position: relative;
+      width: 640px;
+      height: 480px;
+    }
+    video, canvas {
+      position: absolute;
+      width: 640px;
+      height: 480px;
+      border-radius: 10px;
+    }
+    #history {
+      margin-top: 500px;
+      width: 640px;
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 16px;
+    }
+    .movement {
+      color: #00ff88;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Historial de Movimientos Faciales</h2>
+  <div id="container">
+    <video class="input_video" autoplay playsinline></video>
+    <canvas class="output_canvas"></canvas>
+  </div>
+  <div id="history"></div>
+
+  <!-- Librerías de MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+
+  <script>
+    const videoElement = document.querySelector('.input_video');
+    const canvasElement = document.querySelector('.output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const historyEl = document.getElementById("history");
+
+    let movementHistory = [];
+
+    function addMovementToHistory(text) {
+      movementHistory.push(text);
+      const div = document.createElement("div");
+      div.textContent = text;
+      div.className = "movement";
+      historyEl.appendChild(div);
+      historyEl.scrollTop = historyEl.scrollHeight;
+    }
+
+    function detectMovement(landmarks) {
+      const nose = landmarks[1];       // nariz
+      const upperLip = landmarks[13];  // labio superior
+      const lowerLip = landmarks[14];  // labio inferior
+
+      const noseY = nose.y;
+      const lipDistance = Math.abs(lowerLip.y - upperLip.y);
+
+      // Thresholds
+      const mouthOpenThreshold = 0.05;
+      const headUpThreshold = 0.42;
+      const headDownThreshold = 0.70;
+
+      if (lipDistance > mouthOpenThreshold) return "BOCA_ABIERTA";
+      if (noseY < headUpThreshold) return "SUBIO_CABEZA";
+      if (noseY > headDownThreshold) return "BAJO_CABEZA";
+
+      return null;
+    }
+
+    function onResults(results) {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const landmarks = results.multiFaceLandmarks[0];
+
+        // Calcular centro y radio aproximado de la cara
+        const nose = landmarks[1];
+        const leftCheek = landmarks[234];   // punto izquierdo de la cara
+        const rightCheek = landmarks[454];  // punto derecho de la cara
+
+        const centerX = nose.x * canvasElement.width;
+        const centerY = nose.y * canvasElement.height;
+        const radius = Math.hypot(
+          (leftCheek.x - rightCheek.x) * canvasElement.width,
+          (leftCheek.y - rightCheek.y) * canvasElement.height
+        ) / 2;
+
+        // Dibujar círculo verde alrededor de la cara
+        canvasCtx.beginPath();
+        canvasCtx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        canvasCtx.strokeStyle = "#00ff00";
+        canvasCtx.lineWidth = 3;
+        canvasCtx.stroke();
+
+        // Detectar movimientos
+        const movement = detectMovement(landmarks);
+        if (movement) addMovementToHistory(movement);
+      }
+
+      canvasCtx.restore();
+    }
+
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await faceMesh.send({image: videoElement});
+      },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+  </script>
+</body>
+</html>
