@@ -1,0 +1,42 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #121212;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100vh;
+  padding-top: 20px;
+}
+
+#container {
+  position: relative;
+  width: 540px;
+  height: 380px;
+}
+
+video, canvas {
+  position: absolute;
+  width: 540px;
+  height: 380px;
+  border-radius: 10px;
+}
+
+#historial {
+  background: #1e1e1e;
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.movimiento {
+  color: #00ff88;
+  margin-bottom: 5px;
+}
+
+#estado {
+  margin-top: 10px;
+  font-size: 18px;
+  color: #ffd700;
+}
